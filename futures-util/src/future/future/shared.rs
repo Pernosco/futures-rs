@@ -4,7 +4,9 @@ use futures_core::task::{Context, Poll, Waker};
 use slab::Slab;
 use std::cell::UnsafeCell;
 use std::fmt;
+use std::hash::Hasher;
 use std::pin::Pin;
+use std::ptr;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::{Acquire, SeqCst};
 use std::sync::{Arc, Mutex, Weak};
@@ -154,6 +156,19 @@ where
     /// and acting on the result.
     pub fn weak_count(&self) -> Option<usize> {
         self.inner.as_ref().map(|arc| Arc::weak_count(arc))
+    }
+
+    /// Hashes the internal state of this `Shared` in a way that's compatible with `ptr_eq`.
+    pub fn ptr_hash<H: Hasher>(&self, state: &mut H) {
+        match self.inner.as_ref() {
+            Some(arc) => {
+                state.write_u8(1);
+                ptr::hash(Arc::as_ptr(arc), state);
+            }
+            None => {
+                state.write_u8(0);
+            }
+        }
     }
 
     /// Returns `true` if the two `Shared`s point to the same future (in a vein similar to
